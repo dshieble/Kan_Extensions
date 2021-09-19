@@ -13,18 +13,35 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score, recall_score, precision_score
 
+
+def true_positive_rate(truth, preds):
+    # Returns the true positive rate, aka recall
+    tp = sum([1 if preds[i] and truth[i] else 0 for i in range(len(truth))])
+    fn = sum([1 if not preds[i] and truth[i] else 0 for i in range(len(truth))])
+    return tp / (tp + fn)
+
+def true_negative_rate(truth, preds):
+    # Returns the true negative rate
+    tn = sum([1 if not preds[i] and not truth[i] else 0 for i in range(len(truth))])
+    fp = sum([1 if preds[i] and not truth[i] else 0 for i in range(len(truth))])
+    return tn / (tn + fp)
+
+def true_positive_score(y_train, y_test):
+    return recall_score(y_train, y_test)
+
 def evaluate(X_train, y_train, X_test, y_test, f):
     metrics = {
         "roc_auc_score": roc_auc_score,
         "precision_score": precision_score,
-        "recall_score": recall_score
+        "recall_score": recall_score,
+        "true_positive_rate": true_positive_rate,
+        "true_negative_rate": true_negative_rate
     }
     for kind in [RawPreorderClassifier.ran, RawPreorderClassifier.lan]:
         clf = RawPreorderClassifier(kind=kind, f=f)
         clf.fit(X_train, y_train)
-        print(kind)
-        print("tr", {m: f(y_train, clf.predict(X_train)) for m, f in metrics.items()})
-        print("te", {m: f(y_test, clf.predict(X_test)) for m, f in metrics.items()})
+        print("{} tr: {}".format(kind, {m: f(y_train, clf.predict(X_train)) for m, f in metrics.items()}))
+        print("{} te: {}".format(kind, {m: f(y_test, clf.predict(X_test)) for m, f in metrics.items()}))
         print()
 
 class RawPreorderClassifier(object):
