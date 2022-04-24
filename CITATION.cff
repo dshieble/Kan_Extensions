@@ -1,0 +1,8 @@
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Shiebler"
+  given-names: "Dan"
+  orcid: "https://orcid.org/0000-0002-6208-8816"
+title: "Kan_Extensions"
+date-released: 2021-09-12
+url: "https://github.com/dshieble/Kan_Extensions"
