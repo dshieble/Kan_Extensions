@@ -27,9 +27,10 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from umap import UMAP
 
-UMAP_ALGO = "umap"
-TSNE_ALGO = "tsne"
-FASHION_PATH = "/Users/dshiebler/workspace/personal/Category_Theory/Kan_Extensions/data/fashion"
+
+FASHION_PATH = "../data/fashion"
+TRAIN_SIZE = 1000
+TEST_SIZE = 100
 
 def load_mnist(path, kind='train'):
 
@@ -73,41 +74,22 @@ def get_mnist_dataset(included_classes=None, num_train_images=-1, num_test_image
     return raw_Xtrain, raw_ytrain, raw_Xtest, raw_ytest
 
 
+class TransformedSampleProvider(object):
 
-def get_2d_mnist_dataset(num_train_images, num_test_images, transform, pca_components=100):
-    X_mnist_train_raw, y_mnist_train, X_mnist_test_raw, y_mnist_test = get_mnist_dataset(
-        num_train_images=num_train_images, num_test_images=num_test_images)
-    y_train, y_test = np.int64(y_mnist_train), np.int64(y_mnist_test)
-
-    if transform == TSNE_ALGO:
-        steps = [("PCA", PCA(n_components=pca_components)), ("TSNE", TSNE(n_components=2, n_jobs=-1))]
-        Xtransformed = Pipeline(steps).fit_transform(np.vstack((X_mnist_train_raw, y_train)))
-        X_train, X_test = Xtransformed[:X_mnist_train_raw.shape[0]], Xtransformed[X_mnist_test_raw.shape[0]:]
-    elif transform == UMAP_ALGO:
-        steps = [("PCA", PCA(n_components=pca_components)), ("UMAP", UMAP(n_components=2, n_jobs=-1))]
-        pipeline = Pipeline(steps).fit(X_mnist_train_raw, y_train)
-        X_train = pipeline.transform(X_mnist_train_raw)
-        X_test = pipeline.transform(X_mnist_test_raw)
-    else:
-        raise ValueError("transform {} not recognized".format(transform))
-    return X_train, X_test, y_train, y_test
-
-
-def split_dataset(X, y, tr_proportion):
-    num_train_samples = int(X.shape[0] * tr_proportion)
-    indices = np.random.permutation(np.arange(0, X.shape[0]))
-    tr_indices, te_indices = indices[:num_train_samples], indices[num_train_samples:]
-    return X[tr_indices], y[tr_indices], X[te_indices], y[te_indices]
-
-def get_mag_dataset(tr_proportion=0.8, samples=100):
-    X = np.random.random((samples, 3))
-    mins = np.min(X, axis=1)
-    y = mins > np.median(mins)
-    return split_dataset(X, y, tr_proportion)
+    def __init__(self):
+        self.X_train_all_raw, self.y_train_all_raw, self.X_test_all_raw, self.y_test_all_raw = get_mnist_dataset(
+            num_train_images=TRAIN_SIZE * 10,
+            num_test_images=TEST_SIZE * 10)
+        self.y_train_all, self.y_test_all = np.int64(self.y_train_all_raw), np.int64(self.y_test_all_raw)
+        self.pipeline = Pipeline(
+            [("PCA", PCA(n_components=100)), ("UMAP", UMAP(n_components=2, n_jobs=-1))])
     
-def get_wine_dataset(tr_proportion=0.8, target_label=None):
-    wine_dataset = load_wine()
-    X, y = wine_dataset["data"], wine_dataset["target"]
-    if target_label is not None:
-        y = (y == target_label)
-    return split_dataset(X, y, tr_proportion)
+    def get_transformed_sample(self):
+        indices_tr = np.random.permutation(range(self.X_train_all_raw.shape[0]))[:TRAIN_SIZE]
+        indices_te = np.random.permutation(range(self.X_test_all_raw.shape[0]))[:TEST_SIZE]
+
+        self.pipeline.fit(self.X_train_all_raw[indices_tr], self.y_train_all[indices_tr])
+        X_train = self.pipeline.transform(self.X_train_all_raw[indices_tr])
+        X_test = self.pipeline.transform(self.X_test_all_raw[indices_te])
+        return X_train, self.y_train_all[indices_tr], X_test, self.y_test_all[indices_te]
+    

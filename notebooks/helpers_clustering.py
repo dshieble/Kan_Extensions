@@ -29,6 +29,87 @@ from collections import defaultdict
 from scipy.spatial import distance_matrix
 
 
+def get_hyperopt_single_linkage_predictions(X_train, y_train, X_test, n_iter=10):
+    """
+    Experiment with different distance cutoffs for single linkage and return the best results
+    Args:
+        X_train: samples x features training data matrix
+        y_train: labels for training data
+        X_test: samples x features testing data matrix
+        n_iter: Iterations to run
+    Returns:
+        The best clustering results that single linkage can produce
+    """
+    # Sample the training dataset down to the same size as the testing dataset
+    indices_tr = np.random.permutation(range(X_train.shape[0]))[:X_test.shape[0]]
+    X_train, y_train = X_train[indices_tr], y_train[indices_tr]
+    assert X_train.shape[0] == X_test.shape[0]
+    
+    
+    # Find the optimal delta
+    distance_matrix_tr = distance_matrix(X_train, X_train)
+    best_score = -np.inf
+    best_delta = None
+    for delta in tqdm(np.linspace(np.min(distance_matrix_tr), np.max(distance_matrix_tr), n_iter)):
+        single_linkage_predictions = AgglomerativeClustering(
+            affinity="precomputed",
+            n_clusters=None,
+            distance_threshold=delta,
+            linkage="single").fit(distance_matrix_tr).labels_
+        score = adjusted_rand_score(y_train, single_linkage_predictions)
+        if score > best_score:
+            best_score = score
+            best_delta = delta
+
+
+    return AgglomerativeClustering(
+            affinity="precomputed",
+            n_clusters=None,
+            distance_threshold=best_delta,
+            linkage="single").fit(distance_matrix(X_test, X_test)).labels_
+
+
+def get_ran_and_lan_predictions(
+    X_train,
+    y_train,
+    X_test,
+    num_maps_per_cluster_incoming=50,
+    num_maps_per_cluster_pair_outgoing=1,
+    num_cluster_pairs=1
+):
+    """
+    Run the left Kan clustering and right Kan clustering algorithms
+    Args:
+        X_train: samples x features training data matrix
+        y_train: labels for training data
+        X_test: samples x features testing data matrix
+    Returns:
+        Tuple of (left Kan clustering output, right Kan clustering output)
+    """
+    incoming_nonexpansive_maps = sample_incoming_nonexpansive_map_from_two_points_same_cluster(
+        X_train=X_train,
+        X_test=X_test,
+        num_maps_per_cluster=num_maps_per_cluster_incoming,
+        y_train=y_train)
+    incoming_relation = construct_relation_from_incoming_nonexpansive_maps(
+        num_test_points=X_test.shape[0],
+        incoming_nonexpansive_maps=incoming_nonexpansive_maps,
+        y_train=y_train)
+    lan_predictions = generate_predictions_from_relation(X_test, incoming_relation)
+
+    outgoing_nonexpansive_maps = sample_outgoing_nonexpansive_map_to_two_points_different_clusters(
+        X_train=X_train,
+        X_test=X_test,
+        relation=incoming_relation,
+        num_maps_per_cluster_pair=num_maps_per_cluster_pair_outgoing,
+        y_train=y_train,
+        num_cluster_pairs=num_cluster_pairs)
+    outgoing_relation = construct_relation_from_outgoing_nonexpansive_maps(
+        incoming_relation, outgoing_nonexpansive_maps, y_train)
+    ran_predictions = generate_predictions_from_relation(X_test, outgoing_relation)
+    return lan_predictions, ran_predictions
+
+
 def add_to_transitive_closure(relation, new_group):
     """
     Given a partition of a space and a new set of points to be grouped together, return out_relation such that any
