@@ -25,7 +25,6 @@ from sklearn.metrics import roc_auc_score, recall_score, precision_score
 from sklearn.pipeline import Pipeline
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from umap import UMAP
 
 
 FASHION_PATH = "../data/fashion"
@@ -77,6 +76,8 @@ def get_mnist_dataset(included_classes=None, num_train_images=-1, num_test_image
 class TransformedSampleProvider(object):
 
     def __init__(self):
+        from umap import UMAP
+
         self.X_train_all_raw, self.y_train_all_raw, self.X_test_all_raw, self.y_test_all_raw = get_mnist_dataset(
             num_train_images=TRAIN_SIZE * 10,
             num_test_images=TEST_SIZE * 10)
